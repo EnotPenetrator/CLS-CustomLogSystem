@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ExcludeFilters>
+    <!-- Messages containing these keywords will be completely ignored -->
+    <!-- Useful for filtering out noisy mods or game subsystems -->
+    
+    <!-- EOS RFS requests (very spammy, not useful for debugging) -->
+    <Filter Value="[EOS] Created RFS Request" />
+    <Filter Value="[EOS] Read (" />
+    <Filter Value="[EOS] Read cached (" />
+    
+    <!-- Discord output/input device spam -->
+    <Filter Value="[Discord] Current output device" />
+    <Filter Value="[Discord] Current input device" />
+    
+    <!-- MicroSplat texture spam -->
+    <Filter Value="Set Microsplat" />
+    
+    <!-- Backtrace debug messages -->
+    <Filter Value="[BACKTRACE] Deleted old log" />
+    <Filter Value="[BACKTRACE] Using log" />
+    <Filter Value="[BACKTRACE] Player log path" />
+    <Filter Value="[BACKTRACE] Root log path" />
+    
+    <!-- Dynamic music debug spam -->
+    <Filter Value="Loading new config for" />
+    <Filter Value="Loading new ClipSets for" />
+    <Filter Value="loaded new config and clipsets" />
+    <Filter Value="Notified SectionSelector" />
+    <Filter Value="Mixer IsFinished" />
+    <Filter Value="unloaded ClipSets on" />
+    <Filter Value="AudioSource is not playing" />
+    
+    <!-- Weather status spam -->
+    <Filter Value="WeatherStatusTick" />
+    <Filter Value="WeatherBuffUpdate" />
+    <Filter Value="onNewBiomeEntered" />
+    
+    <!-- GamePref/GameStat spam -->
+    <Filter Value="GamePref." />
+    <Filter Value="GameStat." />
+    
+    <!-- Dymesh spam -->
+    <Filter Value="Dymesh:" />
+    <Filter Value="Meshlist count" />
+    <Filter Value="Force load took" />
+    <Filter Value="Clearing queues" />
+    <Filter Value="Cleared queues" />
+    
+    <!-- EOS sanctions spam -->
+    <Filter Value="Player may have active sanctions" />
+    <Filter Value="SanctionsQuery finished" />
+    <Filter Value="CheckSanctionsEnumerator" />
+    
+    <!-- Permission manager spam -->
+    <Filter Value="[PermissionsManager] ResolvePermissions" />
+    
+    <!-- Loading spam -->
+    <Filter Value="Loading permissions file" />
+    <Filter Value="Permissions file unchanged" />
+    <Filter Value="Reloading serveradmin.xml" />
+    
+    <!-- Airdrop spam -->
+    <Filter Value="Next Airdrop" />
+    
+    <!-- Vehicle/Drone/Turret save spam -->
+    <Filter Value="VehicleManager saving" />
+    <Filter Value="DroneManager saving" />
+    <Filter Value="TurretTracker saving" />
+    <Filter Value="VehicleManager saved" />
+    <Filter Value="DroneManager saved" />
+    <Filter Value="TurretTracker saved" />
+    
+    <!-- Unloading spam -->
+    <Filter Value="UnloadTime" />
+    
+    <!-- Allocator memory spam -->
+    <Filter Value="ALLOC_" />
+    <Filter Value="[ALLOC_" />
+    <Filter Value="Peak usage frame count" />
+    <Filter Value="Requested Block Size" />
+    <Filter Value="Peak Block count" />
+    <Filter Value="Peak Allocated memory" />
+    <Filter Value="Peak Large allocation" />
+    <Filter Value="Overflow Count" />
+    <Filter Value="Initial Block Size" />
+    <Filter Value="Current Block Size" />
+    <Filter Value="Peak Allocated Bytes" />
+    <Filter Value="Used Block Count" />
+    <Filter Value="Failed Allocations" />
+    <Filter Value="Large Block size" />
+    
+    <!-- InControl spam -->
+    <Filter Value="InControl (" />
+    <Filter Value="InControl Native" />
+    
+    <!-- GarbageCollector spam -->
+    <Filter Value="GarbageCollector" />
+</ExcludeFilters>

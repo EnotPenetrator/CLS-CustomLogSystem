@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<SpamFilters>
+    <!-- Group similar repeating messages into one line with (xN) counter -->
+    <!-- Modes: -->
+    <!--   ReplaceNumbers - replaces all digits with * (for messages with different coordinates/IDs) -->
+    <!--   FirstChars     - groups by first N characters (use Length attribute) -->
+    <!--   TrimAfter      - cuts off after separator character (use Separator attribute) -->
+    
+    <!-- Examples: -->
+    <!-- <Pattern Value="RecalculateCell" Mode="ReplaceNumbers" /> -->
+    <!-- <Pattern Value="Connection timeout" Mode="FirstChars" Length="50" /> -->
+    <!-- <Pattern Value="Error:" Mode="TrimAfter" Separator=":" /> -->
+</SpamFilters>

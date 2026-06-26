@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<SpamFilters>
+    <!-- Group similar repeating messages into one line with (xN) counter -->
+    <!-- Modes: -->
+    <!--   ReplaceNumbers - replaces all digits with * (for messages with different coordinates/IDs) -->
+    <!--   FirstChars      - groups by first N characters (use Length attribute) -->
+    <!--   TrimAfter       - cuts off after separator character (use Separator attribute) -->
+    <!--   Exact           - only groups 100% identical messages (default) -->
+      
+    <!-- Terrain recalculation spam (coordinates + IDs differ) -->
+    <Pattern Value="RecalculateCell" Mode="ReplaceNumbers" />
+    
+    <!-- EOS HTTP warnings (URLs differ) -->
+    <Pattern Value="[EOS] [LogHttp - Warning]" Mode="FirstChars" Length="80" />
+    
+    <!-- EOS libcurl info messages -->
+    <Pattern Value="libcurl info message cache" Mode="FirstChars" Length="60" />
+    
+    <!-- Discord RTC warnings -->
+    <Pattern Value="[Discord][RTC][Log]" Mode="TrimAfter" Separator="`" />
+    
+    <!-- EOS DataStorage warnings -->
+    <Pattern Value="[LogEOSPlayerDataStorage - Warning]" Mode="FirstChars" Length="60" />
+    
+    <!-- EOS TitleStorage warnings -->
+    <Pattern Value="[LogEOSTitleStorage - Warning]" Mode="FirstChars" Length="60" />
+    
+    <!-- Example: Group by first 50 characters -->
+    <!-- <Pattern Value="Connection timeout" Mode="FirstChars" Length="50" /> -->
+    
+    <!-- Example: Cut off after colon -->
+    <!-- <Pattern Value="MyCustomSpam" Mode="TrimAfter" Separator=":" /> -->
+</SpamFilters>

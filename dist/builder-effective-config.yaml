@@ -1,0 +1,26 @@
+directories:
+  output: dist
+  buildResources: build
+appId: com.cls.logger
+productName: CLS Logger
+win:
+  target:
+    - target: dir
+      arch:
+        - x64
+  icon: icon.ico
+extraResources:
+  - from: config
+    to: config
+    filter:
+      - '**/*'
+files:
+  - filter:
+      - main/**/*
+      - renderer/**/*
+      - build/**/*
+      - node_modules/**/*
+      - package.json
+asar: true
+compression: maximum
+electronVersion: 28.1.0

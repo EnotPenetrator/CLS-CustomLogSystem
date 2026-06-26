@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ExcludeFilters>
+    <!-- Messages containing these keywords will be completely ignored -->
+    <!-- Useful for filtering out noisy game subsystems -->
+    
+    <!-- Examples: -->
+    <!-- <Filter Value="[EOS] Created RFS Request" /> -->
+    <!-- <Filter Value="[Discord] Current output device" /> -->
+    <!-- <Filter Value="WeatherStatusTick" /> -->
+</ExcludeFilters>

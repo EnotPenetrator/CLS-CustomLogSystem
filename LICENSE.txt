@@ -1,0 +1,9 @@
+CLS Logger v3.0.0
+Copyright (c) 2026 EnotPenetrator
+
+All rights reserved.
+
+Distribution, modification, and commercial use of this software
+is permitted only with the explicit written permission of the author.
+
+This software is provided "as is", without warranty of any kind.

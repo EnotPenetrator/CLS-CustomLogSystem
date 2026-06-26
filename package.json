@@ -1,0 +1,16 @@
+{
+  "name": "cls-logger",
+  "version": "2.1.0",
+  "description": "7 Days to Die Custom Log System",
+  "main": "main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win"
+  },
+  "author": "EnotPenetrator",
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "electron": "28.1.0",
+    "electron-builder": "^24.9.1"
+  }
+}

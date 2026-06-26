@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<CustomHints>
+    <!-- Add your own hints for specific errors -->
+    <!-- Key = text to search in error message (case insensitive) -->
+    <!-- Use comma to combine multiple keywords (ALL must match): Key="[TAG], keyword1, keyword2" -->
+    <!-- Hints are checked TOP TO BOTTOM. First match wins. Put specific hints first. -->
+    <!-- Value = hint to display -->
+    
+    <!-- Example: -->
+    <!-- <Hint Key="recalculatecell" Value="Game is recalculating terrain cells. Normal behavior." /> -->
+    <!-- <Hint Key="[EOS], failed to connect" Value="EOS connection failed. Check internet." /> -->
+</CustomHints>

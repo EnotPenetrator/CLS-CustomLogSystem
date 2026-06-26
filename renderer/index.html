@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>7D2D CLS Logger</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Title bar -->
+    <div class="title-bar">
+        <div class="title-bar-text">C<span style="color:#f44336;">L</span>S Logger v3.0.0</div>
+        <div class="title-bar-buttons">
+            <button class="title-btn" onclick="window.electronAPI.minimizeWindow()" title="Minimize">&#9472;</button>
+            <button class="title-btn close-btn" onclick="window.electronAPI.closeWindow()" title="Close">&#10005;</button>
+        </div>
+    </div>
+
+    <!-- Content wrapper -->
+    <div class="content-wrapper">
+
+        <!-- Header -->
+        <div class="header">
+            <div class="header-top">
+                <div class="header-left">
+                    <h1>7 Days to Die - CLS<span class="status" id="statusIndicator">● READY</span></h1>
+                </div>
+                <div class="tab-controls">
+                    <button class="tab-btn active" id="tabLive" onclick="switchTab('live')">📡 Live Logs</button>
+                    <button class="tab-btn" id="tabExternal" onclick="switchTab('external')">📂 External Logs</button>
+                </div>
+            </div>
+            <div class="engine-info">
+                Game: <span id="gameVersion">Unknown</span> | Engine: <span id="engineVersion">Unknown</span>
+            </div>
+            <div class="engine-info">
+                <span>Log file: </span><span id="logFilePath" class="path-text">Waiting for game...</span>
+            </div>
+            <p>Generated: <span id="generatedTime">--</span> | Last refresh: <span id="lastUpdate">--</span></p>
+            <div class="stats">
+                <div class="stat-box error">❌ Errors<span id="statErrors">0</span></div>
+                <div class="stat-box warn">⚠️ Warnings<span id="statWarns">0</span></div>
+                <div class="stat-box info">ℹ️ Info<span id="statInfo">0</span></div>
+                <div class="stat-box debug">🔍 Debug<span id="statDebug">0</span></div>
+            </div>
+        </div>
+
+        <!-- Legend -->
+        <div class="legend">
+            <strong>Legend:</strong>
+            <span><span class="color-dot error"></span> ERROR</span>
+            <span><span class="color-dot warn"></span> WARN</span>
+            <span><span class="color-dot info"></span> INFO</span>
+            <span><span class="color-dot debug"></span> DEBUG</span>
+            <span style="margin-left:20px;"><span class="log-source GAME">GAME</span> Game</span>
+            <span><span class="log-source MOD">MOD</span> Mod</span>
+            <span><span class="log-source FAILED">FAILED</span> Failed mod</span>
+            <a href="#" onclick="window.electronAPI.openConfigFolder()" style="color:#666; text-decoration:none; font-size:11px; margin-left:15px;">⚙ Config</a>
+        </div>
+
+        <!-- Controls -->
+        <div class="controls">
+            <input class="search-box" id="search" placeholder="Search logs..." oninput="onSearchChange()">
+            <span style="color: #666; margin: 0 5px;">Source:</span>
+            <div class="dropdown" id="sourceDropdown">
+                <button class="btn source all active" id="btnSourceMain" onclick="toggleDropdown()">
+                    <span id="sourceLabel">All Sources</span> ▾
+                </button>
+                <div class="dropdown-menu" id="dropdownMenu" style="display:none;">
+                    <a href="#" onclick="event.preventDefault();filterBySource('all')">All Sources</a>
+                    <a href="#" onclick="event.preventDefault();filterBySource('game')">🎮 Game Only</a>
+                    <a href="#" onclick="event.preventDefault();filterBySource('mod')">🧩 All Mods</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Type filter -->
+        <div class="source-controls">
+            <span style="color: #999; font-size: 12px; margin-right: 5px;">Type:</span>
+            <button class="btn active" id="btnAll" onclick="filterBy('all')">All</button>
+            <button class="btn error" id="btnError" onclick="filterBy('error')">Errors</button>
+            <button class="btn warn" id="btnWarn" onclick="filterBy('warn')">Warnings</button>
+            <button class="btn info" id="btnInfo" onclick="filterBy('info')">Info</button>
+            <button class="btn debug" id="btnDebug" onclick="filterBy('debug')">Debug</button>
+            <button class="btn" id="btnFav" onclick="toggleFavorites()" style="color:#FFEB3B;">⭐ Favorites</button>
+            <span style="color: #999; font-size: 12px; margin-left: auto;">Total: <b id="totalCount" style="color:#4CAF50;">0</b></span>
+        </div>
+
+        <!-- Checkbox controls -->
+        <div class="checkbox-controls">
+            <button class="checkbox-btn" onclick="selectAllLogs()">☐ Select All</button>
+            <button class="checkbox-btn" onclick="deselectAllLogs()">☒ Deselect All</button>
+            <button class="checkbox-btn delete" onclick="deleteSelectedLogs()">🗑 Delete Selected</button>
+            <span style="color: #666; margin: 0 5px;">|</span>
+            <button class="checkbox-btn" onclick="addToFavorites()" style="color:#FFEB3B;">⭐ Add to Favorites</button>
+            <button class="checkbox-btn" onclick="removeFromFavorites()">🗑 Remove from Favorites</button>
+            <span style="color: #666; margin: 0 5px;">|</span>
+            <span style="color: #999; font-size: 11px; margin-left: 10px;">
+                <b id="selectedCount" style="color:#4CAF50;">0</b> selected | <b id="favCount" style="color:#FFEB3B;">0</b> favorites
+            </span>
+            <button class="checkbox-btn delete" id="btnClearExternal" onclick="clearExternalLogs()" style="display:none;">🗑 Clear External</button>
+            <span style="flex:1;"></span>
+            <div class="dropdown" style="display:inline-block;">
+                <button class="checkbox-btn" onclick="toggleExportDropdown()">📄 Export ▾</button>
+                <div class="dropdown-menu" id="exportMenu" style="display:none;">
+                    <a href="#" onclick="event.preventDefault();exportLogsSimple('all')">📊 All</a>
+                    <a href="#" onclick="event.preventDefault();exportLogsSimple('selected')">📊 Selected</a>
+                    <a href="#" onclick="event.preventDefault();exportLogsSimple('filter')">📊 Current Filter</a>
+                    <a href="#" onclick="event.preventDefault();exportLogsSimple('favorites')">📊 Favorites</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Logs container -->
+        <div class="log-container" id="logs">
+            <div class="empty-state">
+                <div style="font-size:48px;margin-bottom:20px;">📡</div>
+                <p>Waiting for 7 Days to Die to start...</p>
+                <p style="font-size:12px;color:#666;margin-top:10px;">Logs will appear automatically when the game launches</p>
+            </div>
+        </div>
+
+    </div>
+    <!-- END content-wrapper -->
+
+    <script src="app.js"></script>
+</body>
+</html>
