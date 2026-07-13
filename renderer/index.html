@@ -9,7 +9,7 @@
 <body>
     <!-- Title bar -->
     <div class="title-bar">
-        <div class="title-bar-text">C<span style="color:#f44336;">L</span>S Logger v3.0.0</div>
+        <div class="title-bar-text">C<span style="color:#f44336;">L</span>S Logger v3.2.1</div>
         <div class="title-bar-buttons">
             <button class="title-btn" onclick="window.electronAPI.minimizeWindow()" title="Minimize">&#9472;</button>
             <button class="title-btn close-btn" onclick="window.electronAPI.closeWindow()" title="Close">&#10005;</button>
@@ -26,15 +26,20 @@
                     <h1>7 Days to Die - CLS<span class="status" id="statusIndicator">● READY</span></h1>
                 </div>
                 <div class="tab-controls">
-                    <button class="tab-btn active" id="tabLive" onclick="switchTab('live')">📡 Live Logs</button>
+                    <button class="tab-btn active" id="tabLive" onclick="switchTab('live')">📡 Live Game Logs</button>
+                    <button class="tab-btn" id="tabServer" onclick="switchTab('server')">🖥️ Server Logs</button>
                     <button class="tab-btn" id="tabExternal" onclick="switchTab('external')">📂 External Logs</button>
                 </div>
             </div>
             <div class="engine-info">
                 Game: <span id="gameVersion">Unknown</span> | Engine: <span id="engineVersion">Unknown</span>
             </div>
-            <div class="engine-info">
+            <div class="engine-info" id="livePathInfo">
                 <span>Log file: </span><span id="logFilePath" class="path-text">Waiting for game...</span>
+            </div>
+            <div class="engine-info" id="serverPathInfo" style="display:none;">
+                <span>Server: </span><span id="serverFilePath" class="path-text">Not configured</span>
+                <a href="#" onclick="window.electronAPI.selectServerFolder().then(path => { if(path) selectServerPath(path); })" style="color:#4CAF50;font-size:11px;margin-left:10px;">Browse</a>
             </div>
             <p>Generated: <span id="generatedTime">--</span> | Last refresh: <span id="lastUpdate">--</span></p>
             <div class="stats">

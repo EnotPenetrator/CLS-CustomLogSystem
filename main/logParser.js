@@ -112,24 +112,38 @@ class LogParser {
         if (!line) return 'INFO';
         const upper = line.toUpperCase();
 
-        const parts = line.split(/\s+/);
-        if (parts.length >= 3) {
-            const logLevel = parts[2]?.toUpperCase();
-            if (['EXC', 'ERR', 'ASS'].includes(logLevel)) return 'ERROR';
-            if (logLevel === 'WRN') return 'WARN';
-            if (logLevel === 'INF') return 'INFO';
-            if (logLevel === 'DBG') return 'DEBUG';
+        // Check all lines for highest severity
+        const lines = line.split('\n');
+        let maxLevel = 0; // 0=INFO, 1=DEBUG, 2=WARN, 3=ERROR
+
+        for (const l of lines) {
+            const upperL = l.toUpperCase();
+
+            // Check standard log level (third word)
+            const parts = l.split(/\s+/);
+            if (parts.length >= 3) {
+                const level = parts[2]?.toUpperCase();
+                if (['EXC', 'ERR', 'ASS'].includes(level)) maxLevel = Math.max(maxLevel, 3);
+                else if (level === 'WRN') maxLevel = Math.max(maxLevel, 2);
+                else if (level === 'INF') maxLevel = Math.max(maxLevel, 0);
+                else if (level === 'DBG') maxLevel = Math.max(maxLevel, 1);
+            }
+
+            // Check for ERROR/WARNING anywhere in line
+            if (upperL.includes('ERROR') || upperL.includes('EXCEPTION') || upperL.includes('FATAL')) {
+                maxLevel = Math.max(maxLevel, 3);
+            }
+            if (upperL.includes('WARNING') || upperL.includes('WARN')) {
+                maxLevel = Math.max(maxLevel, 2);
+            }
+            if (upperL.includes('DEBUG') || upperL.includes('DBG')) {
+                maxLevel = Math.max(maxLevel, 1);
+            }
         }
 
-        if (upper.includes(' EXC ') || upper.includes(' ERR ') || upper.includes(' ASS ')) return 'ERROR';
-        if (upper.includes(' WRN ')) return 'WARN';
-        if (upper.includes(' INF ')) return 'INFO';
-        if (upper.includes(' DBG ')) return 'DEBUG';
-
-        if (upper.includes('EXCEPTION') || upper.includes('FATAL')) return 'ERROR';
-        if (upper.includes('WARNING') || upper.includes('WARN')) return 'WARN';
-        if (upper.includes('DEBUG')) return 'DEBUG';
-
+        if (maxLevel >= 3) return 'ERROR';
+        if (maxLevel >= 2) return 'WARN';
+        if (maxLevel >= 1) return 'DEBUG';
         return 'INFO';
     }
 
@@ -153,10 +167,13 @@ class LogParser {
 
         if (line.includes('[MODS]')) return { source: 'MOD', modName: null };
 
-        const tagMatch = line.match(/^\[(\w+)\]/);
+        const tagMatch = line.match(/\[(\w+)\]/);
         if (tagMatch) {
             const tag = tagMatch[1];
-            if (['CBL', 'Harmony', 'DMT'].includes(tag)) {
+            console.log('DETECT SOURCE TAG:', tag, 'knownMods:', this.knownMods, 'customModTags:', this.customModTags);
+            if (['CBL', 'Harmony', 'DMT'].includes(tag) ||
+                (this.knownMods && this.knownMods.includes(tag)) ||
+                (this.customModTags && this.customModTags.includes(tag))) {
                 return { source: 'MOD', modName: tag };
             }
         }

@@ -20,6 +20,14 @@ let lastSize = 0;
 let lastFile = null;
 let spamFilterInstance = null;
 
+let serverLogPath = null;
+let serverAutoDetectTimer = null;
+let serverLastSize = 0;
+let serverLastFile = null;
+let serverWasModified = false;
+let serverLastLineCount = 0;
+let serverCurrentLogPath = null;
+
 // ==================== Config ====================
 const configDir = path.join(path.dirname(app.getPath('exe')), 'config');
 
@@ -61,6 +69,16 @@ function ensureConfigFiles() {
 </ModTags>`;
         fs.writeFileSync(modTagsPath, defaultModTags, 'utf-8');
     }
+
+    const settingsPath = path.join(configDir, 'Settings.xml');
+    if (!fs.existsSync(settingsPath)) {
+        const defaultSettings = `<?xml version="1.0" encoding="utf-8"?>
+<Settings>
+    <ServerLogPath></ServerLogPath>
+</Settings>`;
+        fs.writeFileSync(settingsPath, defaultSettings, 'utf-8');
+    }
+
 }
 
 function loadCustomHints() {
@@ -111,6 +129,46 @@ function loadExcludeFilters() {
     return filters;
 }
 
+function loadModTags() {
+    const modTagsPath = path.join(configDir, 'ModTags.xml');
+    const tags = [];
+    try {
+        if (fs.existsSync(modTagsPath)) {
+            const content = fs.readFileSync(modTagsPath, 'utf-8');
+            const tagMatches = content.matchAll(/<Tag\s+Value="([^"]+)"\s*\/>/g);
+            for (const match of tagMatches) {
+                tags.push(match[1]);
+            }
+        }
+    } catch (e) { }
+    return tags;
+}
+
+function loadSetting(key) {
+    const settingsPath = path.join(configDir, 'Settings.xml');
+    try {
+        if (fs.existsSync(settingsPath)) {
+            const content = fs.readFileSync(settingsPath, 'utf-8');
+            const match = content.match(new RegExp(`<${key}>(.*?)</${key}>`));
+            return match ? match[1] : '';
+        }
+    } catch (e) { }
+    return '';
+}
+
+function saveSetting(key, value) {
+    const settingsPath = path.join(configDir, 'Settings.xml');
+    try {
+        let content = fs.readFileSync(settingsPath, 'utf-8');
+        if (content.includes(`<${key}>`)) {
+            content = content.replace(new RegExp(`<${key}>.*?</${key}>`), `<${key}>${value}</${key}>`);
+        } else {
+            content = content.replace('</Settings>', `    <${key}>${value}</${key}>\n</Settings>`);
+        }
+        fs.writeFileSync(settingsPath, content, 'utf-8');
+    } catch (e) { }
+}
+
 // ==================== Window ====================
 function createWindow() {
     mainWindow = new BrowserWindow({
@@ -143,6 +201,9 @@ function createWindow() {
     mainWindow.on('close', () => {
         if (autoDetectTimer) {
             clearInterval(autoDetectTimer);
+        }
+        if (serverAutoDetectTimer) {
+            clearInterval(serverAutoDetectTimer);
         }
         mainWindow = null;
     });
@@ -222,6 +283,13 @@ function startAutoDetect() {
                     const lines = mergeMultilineLogs(rawLines);
                     const parsed = [];
                     for (const line of lines) {
+                        // Auto-detect mods from Loaded Mod lines
+                        if (line.includes('Loaded Mod:')) {
+                            const modMatch = line.match(/Loaded Mod: (.+?) \(/);
+                            if (modMatch && LogParser.knownMods && !LogParser.knownMods.includes(modMatch[1])) {
+                                LogParser.knownMods.push(modMatch[1]);
+                            }
+                        }
                         const entry = LogParser.parse(line, hints);
                         if (entry) parsed.push(entry);
                     }
@@ -239,6 +307,13 @@ function startAutoDetect() {
                     if (newLines.length > 0) {
                         const parsed = [];
                         for (const line of newLines) {
+                            // Auto-detect mods from Loaded Mod lines
+                            if (line.includes('Loaded Mod:')) {
+                                const modMatch = line.match(/Loaded Mod: (.+?) \(/);
+                                if (modMatch && LogParser.knownMods && !LogParser.knownMods.includes(modMatch[1])) {
+                                    LogParser.knownMods.push(modMatch[1]);
+                                }
+                            }
                             const entry = LogParser.parse(line, hints);
                             if (entry) parsed.push(entry);
                         }
@@ -249,6 +324,99 @@ function startAutoDetect() {
                     lastLineCount = lines.length;
                 }
                 lastSize = stats.size;
+            }
+        } catch (e) { }
+    }, 1000);
+}
+
+function getServerLogFiles() {
+    if (fs.existsSync(serverLogPath)) {
+        const files = fs.readdirSync(serverLogPath)
+            .filter(f => f.startsWith('output_log_dedi_'))
+            .sort()
+            .reverse()
+            .map(f => path.join(serverLogPath, f));
+        if (files.length > 0) return files;
+    }
+
+    const dataPath = path.join(serverLogPath, '7DaysToDieServer_Data');
+    try {
+        if (fs.existsSync(dataPath)) {
+            return fs.readdirSync(dataPath)
+                .filter(f => f.startsWith('output_log_dedi_'))
+                .sort()
+                .reverse()
+                .map(f => path.join(dataPath, f));
+        }
+    } catch (e) { }
+    return [];
+}
+
+function startServerAutoDetect() {
+    serverLastSize = 0;
+    serverLastFile = null;
+    let wasModified = false;
+    let lastLineCount = 0;
+
+    serverAutoDetectTimer = setInterval(() => {
+        if (!serverLogPath) return;
+        const files = getServerLogFiles();
+        if (files.length === 0) return;
+
+        const latestFile = files[0];
+
+        try {
+            const stats = fs.statSync(latestFile);
+
+            // New file detected
+            if (latestFile !== serverLastFile) {
+                serverLastFile = latestFile;
+                serverLastSize = stats.size;
+                wasModified = false;
+                lastLineCount = 0;
+                return;
+            }
+
+            // File changed size — server is writing
+            if (stats.size !== serverLastSize) {
+                if (!wasModified) {
+                    // First change detected — load full file
+                    wasModified = true;
+                    if (mainWindow && !mainWindow.isDestroyed()) {
+                        mainWindow.webContents.send('server-clear-logs');
+                        mainWindow.webContents.send('server-auto-detect-log', latestFile);
+                    }
+                    const content = fs.readFileSync(latestFile, 'utf-8');
+                    const rawLines = content.split('\n').filter(l => l.trim());
+                    const lines = mergeMultilineLogs(rawLines);
+                    const parsed = [];
+                    for (const line of lines) {
+                        const entry = LogParser.parse(line, hints);
+                        if (entry) parsed.push(entry);
+                    }
+                    if (mainWindow && !mainWindow.isDestroyed()) {
+                        mainWindow.webContents.send('server-new-logs', parsed);
+                    }
+                    lastLineCount = lines.length;
+                } else if (stats.size > serverLastSize) {
+                    const content = fs.readFileSync(latestFile, 'utf-8');
+                    const rawLines = content.split('\n').filter(l => l.trim());
+                    const lines = mergeMultilineLogs(rawLines);
+
+                    const newLines = lines.slice(lastLineCount);
+                    if (newLines.length > 0) {
+                        const parsed = [];
+                        for (const line of newLines) {
+                            const entry = LogParser.parse(line, hints);
+                            if (entry) parsed.push(entry);
+                        }
+                        if (mainWindow && !mainWindow.isDestroyed()) {
+                            mainWindow.webContents.send('server-new-logs', parsed);
+                        }
+                    }
+                    lastLineCount = lines.length;
+                }
+                serverLastSize = stats.size;
             }
         } catch (e) { }
     }, 1000);
@@ -271,6 +439,25 @@ ipcMain.on('open-config-folder', () => {
 });
 
 // ==================== IPC Handlers ====================
+
+ipcMain.handle('select-server-folder', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+        title: 'Select 7 Days to Die Server folder',
+        properties: ['openDirectory']
+    });
+    if (!result.canceled && result.filePaths.length > 0) {
+        const serverPath = result.filePaths[0];
+        saveSetting('ServerLogPath', serverPath);
+        return serverPath;
+    }
+    return null;
+});
+
+ipcMain.handle('get-server-path', () => {
+    const savedPath = loadSetting('ServerLogPath');
+    return savedPath || null;
+});
+
 ipcMain.handle('select-log-file', async () => {
     const result = await dialog.showOpenDialog(mainWindow, {
         title: 'Select 7 Days to Die log file',
@@ -337,6 +524,8 @@ ipcMain.handle('save-file', async (event, content, defaultName) => {
 
 // ==================== App Lifecycle ====================
 app.whenReady().then(() => {
+    LogParser.customModTags = loadModTags();
+    LogParser.knownMods = [];
     ensureConfigFiles();
     loadCustomHints();
 
@@ -348,4 +537,16 @@ app.whenReady().then(() => {
 
     createWindow();
     startAutoDetect();
+
+    // Load server path
+    const savedServerPath = loadSetting('ServerLogPath');
+    if (savedServerPath) {
+        serverLogPath = savedServerPath;
+        startServerAutoDetect();
+    }
+});
+
+ipcMain.on('update-known-mods', (event, mods) => {
+    console.log('MAIN RECEIVED MODS:', mods);
+    LogParser.knownMods = mods;
 });

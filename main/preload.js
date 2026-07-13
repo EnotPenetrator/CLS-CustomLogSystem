@@ -9,6 +9,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getVersions: () => ipcRenderer.invoke('get-versions'),
     saveFile: (content, defaultName) => ipcRenderer.invoke('save-file', content, defaultName),
 
+    // Server
+    selectServerFolder: () => ipcRenderer.invoke('select-server-folder'),
+    getServerPath: () => ipcRenderer.invoke('get-server-path'),
+
+    updateKnownMods: (mods) => ipcRenderer.send('update-known-mods', mods),
+
     onNewLogs: (callback) => {
         ipcRenderer.on('new-logs', (event, logs) => callback(logs));
     },
@@ -20,6 +26,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     onClearLogs: (callback) => {
         ipcRenderer.on('clear-logs', () => callback());
+    },
+
+    // Server events
+    onServerNewLogs: (callback) => {
+        ipcRenderer.on('server-new-logs', (event, logs) => callback(logs));
+    },
+    onServerClearLogs: (callback) => {
+        ipcRenderer.on('server-clear-logs', () => callback());
+    },
+    onServerAutoDetectLog: (callback) => {
+        ipcRenderer.on('server-auto-detect-log', (event, logPath) => callback(logPath));
     },
 
     minimizeWindow: () => ipcRenderer.send('window-minimize'),

@@ -22,6 +22,12 @@ let favoritesExternal = JSON.parse(sessionStorage.getItem('cls_favorites_externa
 let externalGameVersion = 'N/A';
 let externalEngineVersion = 'N/A';
 let externalFilePath = 'No file loaded';
+let serverLogs = [];
+let serverGameVersion = 'N/A';
+let serverEngineVersion = 'N/A';
+let serverLogPath = 'Not configured';
+let knownServerMods = [];
+let favoritesServer = JSON.parse(sessionStorage.getItem('cls_favorites_server') || '[]');
 let liveLogPath = 'Waiting for game...';
 let liveGameVersion = 'Unknown';
 let liveEngineVersion = 'Unknown';
@@ -109,7 +115,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
         }
-
         const container = document.getElementById('logs');
         if (container) {
             container.innerHTML = `<div class="empty-state">
@@ -120,6 +125,52 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         document.getElementById('totalCount').textContent = '0';
         updateStats();
+    });   
+
+    // Server log handlers (после onClearLogs)
+    window.electronAPI.onServerNewLogs((newLogs) => {
+        const filtered = newLogs.filter(l => l !== null);
+        if (filtered.length > 0) {
+            serverLogs.push(...filtered);
+            if (serverLogs.length > 50000) {
+                serverLogs = serverLogs.slice(-50000);
+            }
+            if (currentTab === 'server') {
+                renderLogs();
+                updateStats();
+            }
+        }
+    });
+
+    window.electronAPI.onServerClearLogs(() => {
+        serverLogs = [];
+        knownServerMods = [];
+        lastLogCount = 0;
+        const container = document.getElementById('logs');
+        if (container) {
+            container.innerHTML = `<div class="empty-state">
+                <div style="font-size:48px;margin-bottom:20px;">🖥️</div>
+                <p>New server session detected...</p>
+                <p style="font-size:12px;color:#666;margin-top:10px;">Loading server logs...</p>
+            </div>`;
+        }
+        document.getElementById('totalCount').textContent = '0';
+        updateStats();
+    });
+
+    window.electronAPI.onServerAutoDetectLog((logPath) => {
+        serverLogPath = logPath;
+        if (currentTab === 'server') {
+            document.getElementById('logFilePath').textContent = logPath;
+        }
+        document.getElementById('statusIndicator').textContent = '● LIVE';
+        document.getElementById('statusIndicator').className = 'status watching';
+    });
+
+    window.electronAPI.getServerPath().then(savedPath => {
+        if (savedPath) {
+            serverLogPath = savedPath;
+        }
     });
 
     const container = document.getElementById('logs');
@@ -253,6 +304,7 @@ function parseXlsLogs(htmlString) {
 
 function parseLogLine(line) {
     if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(line)) return null;
+    if (line.includes('CBDS')) console.log('PARSING CBDS LINE:', line.substring(0, 80));
     const type = detectLogType(line);
     const { source, modName } = detectLogSource(line);
     return {
@@ -267,7 +319,9 @@ function parseLogLine(line) {
 
 // ==================== Filtering and Rendering ====================
 function getActiveLogs() {
-    return currentTab === 'live' ? allLogs : externalLogs;
+    if (currentTab === 'live') return allLogs;
+    if (currentTab === 'server') return serverLogs;
+    return externalLogs;
 }
 
 function filterLogsArray(logs) {
@@ -312,17 +366,20 @@ function renderLogs() {
     const container = document.getElementById('logs');
     if (!container) return;
 
-    const filteredLogs = filterLogsArray(allLogs);
+    const logs = currentTab === 'server' ? serverLogs : allLogs;
+    const filteredLogs = filterLogsArray(logs);
 
     const wasAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
 
     container.innerHTML = '';
 
     if (filteredLogs.length === 0) {
-        if (allLogs.length === 0) {
+        if (logs.length === 0) {
+            const icon = currentTab === 'server' ? '🖥️' : '📡';
+            const msg = currentTab === 'server' ? 'Select server folder to start monitoring...' : 'Waiting for 7 Days to Die to start...';
             container.innerHTML = `<div class="empty-state">
-                <div style="font-size:48px;margin-bottom:20px;">📡</div>
-                <p>Waiting for 7 Days to Die to start...</p>
+                <div style="font-size:48px;margin-bottom:20px;">${icon}</div>
+                <p>${msg}</p>
             </div>`;
         } else {
             container.innerHTML = `<div class="empty-state">
@@ -429,6 +486,15 @@ function createLogEntry(log, index) {
 }
 
 // ==================== Helper Functions ====================
+function selectServerPath(path) {
+    serverLogPath = path;
+    if (currentTab === 'server') {
+        document.getElementById('logFilePath').textContent = 'Server: ' + path;
+        document.getElementById('statusIndicator').textContent = '● LIVE';
+        document.getElementById('statusIndicator').className = 'status watching';
+    }
+}
+
 function getColorClass(type) {
     switch (type.toUpperCase()) {
         case 'ERROR': return 'error';
@@ -493,10 +559,10 @@ function detectLogSource(line) {
 
     if (line.includes('[MODS]')) return { source: 'MOD', modName: null };
 
-    const tagMatch = line.match(/^\[(\w+)\]/);
+    const tagMatch = line.match(/\[(\w+)\]/);
     if (tagMatch) {
         const tag = tagMatch[1];
-        if (['CBL', 'Harmony', 'DMT'].includes(tag)) {
+        if (['CBL', 'Harmony', 'DMT'].includes(tag) || knownMods.includes(tag)) {
             return { source: 'MOD', modName: tag };
         }
     }
@@ -644,6 +710,8 @@ function extractKnownMods(logs) {
             addModToDropdown(log.blockName);
         }
     }
+    console.log('KNOWN MODS UPDATED:', knownMods);
+    window.electronAPI.updateKnownMods(knownMods);
 }
 
 function addModToDropdown(mod) {
@@ -708,6 +776,16 @@ function extractModsFromLiveLogs() {
     rebuildModDropdown(mods);
 }
 
+function extractModsFromServerLogs() {
+    const mods = [];
+    for (const log of serverLogs) {
+        if (log.blockName && !log.blockName.includes('(FAILED)') && !mods.includes(log.blockName)) {
+            mods.push(log.blockName);
+        }
+    }
+    mods.forEach(mod => addModToDropdown(mod));
+}
+
 function extractModsFromExternalLogs() {
     const mods = [];
     for (const log of externalLogs) {
@@ -737,7 +815,11 @@ function rebuildModDropdown(mods) {
 }
 
 function updateStats() {
-    const logs = currentTab === 'live' ? allLogs : externalLogs;
+    let logs;
+    if (currentTab === 'live') logs = allLogs;
+    else if (currentTab === 'server') logs = serverLogs;
+    else logs = externalLogs;
+
     let errorCount = 0, warnCount = 0, infoCount = 0, debugCount = 0;
 
     for (const log of logs) {
@@ -769,7 +851,7 @@ function filterBy(type) {
     sessionStorage.setItem('cls_filter', type);
     lastLogCount = 0;
     updateButtons();
-    if (currentTab === 'live') renderLogs();
+    if (currentTab === 'live' || currentTab === 'server') renderLogs();
     else renderExternalLogs();
     updateSelectedCount();
 }
@@ -790,7 +872,7 @@ function toggleFavorites() {
     sessionStorage.setItem('cls_filter', currentFilter);
     lastLogCount = 0;
     updateButtons();
-    if (currentTab === 'live') renderLogs();
+    if (currentTab === 'live' || currentTab === 'server') renderLogs();
     else renderExternalLogs();
     updateSelectedCount();
 }
@@ -806,7 +888,7 @@ function filterBySource(source) {
     sessionStorage.setItem('cls_source', source);
     lastLogCount = 0;
     updateButtons();
-    if (currentTab === 'live') renderLogs();
+    if (currentTab === 'live' || currentTab === 'server') renderLogs();
     else renderExternalLogs();
     updateSelectedCount();
 }
@@ -821,7 +903,7 @@ function onSearchChange() {
     savedSearch = document.getElementById('search').value;
     sessionStorage.setItem('cls_search', savedSearch);
     lastLogCount = 0;
-    if (currentTab === 'live') renderLogs();
+    if (currentTab === 'live' || currentTab === 'server') renderLogs();
     else renderExternalLogs();
     updateSelectedCount();
 }
@@ -868,10 +950,27 @@ function switchTab(tab) {
     lastLogCount = 0;
 
     document.getElementById('tabLive').classList.toggle('active', tab === 'live');
+    document.getElementById('tabServer').classList.toggle('active', tab === 'server');
     document.getElementById('tabExternal').classList.toggle('active', tab === 'external');
 
-    const clearBtn = document.getElementById('btnClearExternal');
-    if (clearBtn) clearBtn.style.display = tab === 'external' ? '' : 'none';
+    const clearBtnExternal = document.getElementById('btnClearExternal');
+    if (clearBtnExternal) clearBtnExternal.style.display = tab === 'external' ? '' : 'none';
+
+    // Show/hide path info
+    document.getElementById('livePathInfo').style.display = tab === 'live' ? '' : 'none';
+    document.getElementById('serverPathInfo').style.display = tab === 'server' ? '' : 'none';
+
+    // Clear mod dropdown
+    const menu = document.getElementById('dropdownMenu');
+    if (menu) {
+        const allLinks = menu.querySelectorAll('a');
+        allLinks.forEach(a => {
+            const text = a.textContent;
+            if (text !== 'All Sources' && text !== '🎮 Game Only' && text !== '🧩 All Mods') {
+                a.remove();
+            }
+        });
+    }
 
     if (tab === 'external') {
         document.getElementById('gameVersion').textContent = externalGameVersion;
@@ -879,11 +978,17 @@ function switchTab(tab) {
         document.getElementById('logFilePath').textContent = externalFilePath;
         extractModsFromExternalLogs();
         renderExternalLogs();
+    } else if (tab === 'server') {
+        document.getElementById('gameVersion').textContent = serverGameVersion;
+        document.getElementById('engineVersion').textContent = serverEngineVersion;
+        document.getElementById('logFilePath').textContent = serverLogPath;
+        extractModsFromServerLogs();
+        renderLogs();
     } else {
         document.getElementById('gameVersion').textContent = liveGameVersion;
         document.getElementById('engineVersion').textContent = liveEngineVersion;
         document.getElementById('logFilePath').textContent = liveLogPath;
-        extractModsFromLiveLogs();
+        rebuildModDropdown(knownMods);
         renderLogs();
     }
 
@@ -891,7 +996,7 @@ function switchTab(tab) {
     updateFavCount();
     updateSelectedCount();
 
-    const logs = currentTab === 'live' ? allLogs : externalLogs;
+    const logs = getActiveLogs();
     const filtered = filterLogsArray(logs);
     document.getElementById('totalCount').textContent = filtered.length;
 }
@@ -908,6 +1013,15 @@ function restoreTab() {
         document.getElementById('engineVersion').textContent = externalEngineVersion;
         document.getElementById('logFilePath').textContent = externalFilePath;
         renderExternalLogs();
+    } else if (currentTab === 'server') {
+        document.getElementById('tabLive').classList.remove('active');
+        document.getElementById('tabServer').classList.add('active');
+        document.getElementById('livePathInfo').style.display = 'none';
+        document.getElementById('serverPathInfo').style.display = '';
+        document.getElementById('gameVersion').textContent = serverGameVersion;
+        document.getElementById('engineVersion').textContent = serverEngineVersion;
+        document.getElementById('logFilePath').textContent = serverLogPath;
+        renderLogs();
     }
 }
 
@@ -916,10 +1030,13 @@ function clearExternalLogs() {
     externalGameVersion = 'N/A';
     externalEngineVersion = 'N/A';
     externalFilePath = 'No file loaded';
+    favoritesExternal = [];
     lastLogCount = 0;
     rebuildModDropdown([]);
     renderExternalLogs();
     updateStats();
+    updateFavCount();
+    updateSelectedCount();
 }
 
 // ==================== Selection and Favorites ====================
@@ -975,6 +1092,12 @@ function deleteSelectedLogs() {
             const key = log.timestamp + '|' + log.message;
             return !deletedKeys.includes(key);
         });
+    } else if (currentTab === 'server') {
+        for (const log of selected) {
+            serverLogs = serverLogs.filter(l => l !== log);
+            const key = log.timestamp + '|' + log.message;
+            favoritesServer = favoritesServer.filter(f => f.key !== key);
+        }
     } else {
         for (const log of selected) {
             externalLogs = externalLogs.filter(l => l !== log);
@@ -986,18 +1109,22 @@ function deleteSelectedLogs() {
     saveFavorites();
     updateFavCount();
     lastLogCount = 0;
-    if (currentTab === 'live') renderLogs();
+    if (currentTab === 'live' || currentTab === 'server') renderLogs();
     else renderExternalLogs();
     updateSelectedCount();
 }
 
 function getFavorites() {
-    return currentTab === 'live' ? favoritesLive : favoritesExternal;
+    if (currentTab === 'live') return favoritesLive;
+    if (currentTab === 'server') return favoritesServer;
+    return favoritesExternal;
 }
 
 function saveFavorites() {
     if (currentTab === 'live') {
         sessionStorage.setItem('cls_favorites_live', JSON.stringify(favoritesLive));
+    } else if (currentTab === 'server') {
+        sessionStorage.setItem('cls_favorites_server', JSON.stringify(favoritesServer));
     } else {
         sessionStorage.setItem('cls_favorites_external', JSON.stringify(favoritesExternal));
     }
@@ -1013,11 +1140,12 @@ function addToFavorites() {
         }
     }
     if (currentTab === 'live') favoritesLive = favs;
+    else if (currentTab === 'server') favoritesServer = favs;
     else favoritesExternal = favs;
     saveFavorites();
     updateFavCount();
     if (currentFilter === 'favorites') {
-        if (currentTab === 'live') renderLogs();
+        if (currentTab === 'live' || currentTab === 'server') renderLogs();
         else renderExternalLogs();
     }
 }
@@ -1030,17 +1158,21 @@ function removeFromFavorites() {
         favs = favs.filter(f => f.key !== key);
     }
     if (currentTab === 'live') favoritesLive = favs;
+    else if (currentTab === 'server') favoritesServer = favs;
     else favoritesExternal = favs;
     saveFavorites();
     updateFavCount();
     if (currentFilter === 'favorites') {
-        if (currentTab === 'live') renderLogs();
+        if (currentTab === 'live' || currentTab === 'server') renderLogs();
         else renderExternalLogs();
     }
 }
 
 function updateFavCount() {
-    const favs = currentTab === 'live' ? favoritesLive : favoritesExternal;
+    let favs;
+    if (currentTab === 'live') favs = favoritesLive;
+    else if (currentTab === 'server') favs = favoritesServer;
+    else favs = favoritesExternal;
     document.getElementById('favCount').textContent = favs.length;
 }
 

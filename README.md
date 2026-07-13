@@ -1,4 +1,4 @@
-# CLS Logger v3.0.0
+# CLS Logger v3.1.1
 
 Standalone log viewer for 7 Days to Die. No mod installation required.
 
